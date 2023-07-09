@@ -10,17 +10,17 @@ class Motion {
 
   Motion._internal();
 
-  StreamSubscription<AccelerometerEvent> _accelerometerStreamSubscription;
+  StreamSubscription<AccelerometerEvent>? _accelerometerStreamSubscription;
   double _lastX = 0.0;
   double _lastY = 0.0;
   double _lastZ = 0.0;
 
-  StreamController<MotionEvent> _accelerometerStreamController;
+  StreamController<MotionEvent>? _accelerometerStreamController;
 
   int _eventsPerSecond = 0;
 
   void _initiateMotionStream() {
-    setSensorsSampleRate(5);
+    //setSensorsSampleRate(5);
     _accelerometerStreamSubscription = accelerometerEvents.listen((AccelerometerEvent accelerometerEvent) {
       _lastX = accelerometerEvent.x;
       _lastY = accelerometerEvent.y;
@@ -34,11 +34,11 @@ class Motion {
     });
 
     Timer.periodic(Duration(milliseconds: 200), (Timer timer) {
-      if (_accelerometerStreamController != null && _accelerometerStreamController.hasListener) {
-        _accelerometerStreamController.sink.add(MotionEvent(_lastX, _lastY, _lastZ));
+      if (_accelerometerStreamController != null && _accelerometerStreamController!.hasListener) {
+        _accelerometerStreamController!.sink.add(MotionEvent(_lastX, _lastY, _lastZ));
       } else if (_accelerometerStreamController != null) {
-        _accelerometerStreamSubscription.cancel();
-        _accelerometerStreamController.close();
+        _accelerometerStreamSubscription!.cancel();
+        _accelerometerStreamController!.close();
         _accelerometerStreamSubscription = null;
         _accelerometerStreamController = null;
         timer.cancel();
@@ -55,7 +55,7 @@ class Motion {
       _accelerometerStreamController = StreamController.broadcast();
     }
 
-    return _accelerometerStreamController.stream;
+    return _accelerometerStreamController!.stream;
   }
 
 }

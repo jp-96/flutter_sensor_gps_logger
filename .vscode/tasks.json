@@ -1,0 +1,95 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "rebuild apk",
+            "type": "shell",
+            "command": "echo",
+            "args": [
+                "Rebuild Android APK - Done!"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn": [
+                "flutter clean",
+                "flutter build bundle",
+                "copy config files",
+                "flutter build apk"
+            ],
+            "dependsOrder": "sequence",
+        },
+        {
+            "label": "flutter clean",
+            "type": "shell",
+            "command": "flutter",
+            "args": [
+                "clean"
+            ],
+            "problemMatcher": [],
+        },
+        {
+            "label": "flutter build bundle",
+            "type": "shell",
+            "command": "flutter",
+            "args": [
+                "build",
+                "bundle"
+            ],
+            "problemMatcher": [],
+        },
+        {
+            "label": "copy config files",
+            "type": "shell",
+            "command": "cp",
+            "args": [
+                "-rf",
+                "${workspaceFolder}/.configfiles/.android",
+                "${workspaceFolder}/.configfiles/.ios",
+                "${workspaceFolder}"
+            ],
+            "problemMatcher": [],
+        },
+        {
+            "label": "flutter build apk",
+            "type": "shell",
+            "command": "flutter",
+            "args": [
+                "build",
+                "apk"
+            ],
+            "problemMatcher": [],
+        },
+        {
+            "label": "adb connect",
+            "type": "shell",
+            "command": "adb",
+            "args": [
+                "connect",
+                "${input:adbConnectHostPort}"
+            ],
+            "problemMatcher": [],
+        },
+        {
+            "label": "adb disconnect",
+            "type": "shell",
+            "command": "adb",
+            "args": [
+                "disconnect"
+            ],
+            "problemMatcher": [],
+        },
+    ],
+    "inputs": [
+        {
+            "id": "adbConnectHostPort",
+            "description": "adb connect HOST[:PORT]",
+            "default": "",
+            "type": "promptString"
+        },
+    ]
+}
