@@ -1,5 +1,6 @@
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
+import 'package:permission_handler/permission_handler.dart';
 
 class Location {
   static final Location _singleton = new Location._internal();
@@ -10,21 +11,21 @@ class Location {
 
   Location._internal();
 
-  StreamSubscription<Position> _positionStreamSubscription;
+  StreamSubscription<Position>? _positionStreamSubscription;
   double _traveledDistance = 0.0;
   double _relativeAltitudeGain = 0.0;
   double _relativeAltitudeLoss = 0.0;
-  double _lastLatitude;
-  double _lastLongitude;
-  double _lastAltitude;
+  double? _lastLatitude;
+  double? _lastLongitude;
+  double? _lastAltitude;
 
-  int accuracyFilter;
-  int distanceFilter;
+  late int accuracyFilter;
+  late int distanceFilter;
 
   List<double> _lastAltitudes = [];
 
-  StreamController<PositionEvent> _accuracyStreamController;
-  StreamController<DistanceEvent> _traveledDistanceStreamController;
+  StreamController<PositionEvent>? _accuracyStreamController;
+  StreamController<DistanceEvent>? _traveledDistanceStreamController;
 
   void setAccuracyFilter(int accuracy) {
     accuracyFilter = accuracy;
@@ -35,23 +36,30 @@ class Location {
   }
 
   void _initiatePositionStream() {
-    LocationOptions locationOptions = LocationOptions(accuracy: LocationAccuracy.best, distanceFilter: distanceFilter);
-    final Stream<Position> positionStream = Geolocator().getPositionStream(locationOptions);
+    _handlePermission();
+    LocationSettings locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.best, distanceFilter: distanceFilter);
+    final Stream<Position> positionStream =
+        Geolocator.getPositionStream(locationSettings: locationSettings);
     _positionStreamSubscription = positionStream.listen((Position position) {
-      if (_accuracyStreamController != null && _accuracyStreamController.hasListener) {
-        _accuracyStreamController.sink.add(PositionEvent(position.accuracy, position.latitude, position.longitude, position.altitude));
+      print("Position Stream ${position.latitude} ${position.longitude}");
+      if (_accuracyStreamController != null &&
+          _accuracyStreamController!.hasListener) {
+        _accuracyStreamController!.sink.add(PositionEvent(position.accuracy,
+            position.latitude, position.longitude, position.altitude));
       } else if (_accuracyStreamController != null) {
-        _accuracyStreamController.close();
+        _accuracyStreamController!.close();
         _accuracyStreamController = null;
       }
 
-      if (_traveledDistanceStreamController != null && _traveledDistanceStreamController.hasListener) {
+      if (_traveledDistanceStreamController != null &&
+          _traveledDistanceStreamController!.hasListener) {
         if (position.accuracy <= accuracyFilter) {
           _updateRelativeAltitudes(position.altitude);
           _updateTraveledDistance(position.latitude, position.longitude);
         }
       } else if (_traveledDistanceStreamController != null) {
-        _traveledDistanceStreamController.close();
+        _traveledDistanceStreamController!.close();
         _traveledDistanceStreamController = null;
         _traveledDistance = 0.0;
         _relativeAltitudeGain = 0.0;
@@ -62,20 +70,57 @@ class Location {
         _lastAltitudes.clear();
       }
 
-      if (_accuracyStreamController == null && _traveledDistanceStreamController == null) {
-        _positionStreamSubscription.cancel();
+      if (_accuracyStreamController == null &&
+          _traveledDistanceStreamController == null) {
+        _positionStreamSubscription?.cancel();
         _positionStreamSubscription = null;
       }
 
-      if (position.accuracy <= accuracyFilter || _traveledDistanceStreamController == null) {
+      if (position.accuracy <= accuracyFilter ||
+          _traveledDistanceStreamController == null) {
         _lastLatitude = position.latitude;
         _lastLongitude = position.longitude;
       }
     });
   }
 
+  _handlePermission() async {
+    await Permission.activityRecognition.request().isGranted;
+
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Test if location services are enabled.
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      // Location services are not enabled don't continue
+      // accessing the position and request users of the
+      // App to enable the location services.
+      return Future.error('Location services are disabled.');
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        // Permissions are denied, next time you could try
+        // requesting permissions again (this is also where
+        // Android's shouldShowRequestPermissionRationale
+        // returned true. According to Android guidelines
+        // your App should show an explanatory UI now.
+        return Future.error('Location permissions are denied');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      // Permissions are denied forever, handle appropriately.
+      return Future.error(
+          'Location permissions are permanently denied, we cannot request permissions.');
+    }
+  }
+
   cancelPositionStream() {
-    _positionStreamSubscription.cancel();
+    _positionStreamSubscription?.cancel();
     _positionStreamSubscription = null;
   }
 
@@ -84,8 +129,10 @@ class Location {
       return;
     }
 
-    _traveledDistance += await Geolocator().distanceBetween(_lastLatitude, _lastLongitude, currentLatitude, currentLongitude);
-    _traveledDistanceStreamController.sink.add(DistanceEvent(_traveledDistance, _relativeAltitudeGain, _relativeAltitudeLoss));
+    _traveledDistance += Geolocator.distanceBetween(
+        _lastLatitude!, _lastLongitude!, currentLatitude, currentLongitude);
+    _traveledDistanceStreamController?.sink.add(DistanceEvent(
+        _traveledDistance, _relativeAltitudeGain, _relativeAltitudeLoss));
   }
 
   _updateRelativeAltitudes(currentAltitude) {
@@ -96,11 +143,11 @@ class Location {
     if (_lastAltitudes.length == _smoothingThreshold) {
       double _sumAltitudes = 0.0;
       double _sumDiffAltitudes = 0.0;
-      for (var i = 0; i < _smoothingThreshold-1; i++) {
+      for (var i = 0; i < _smoothingThreshold - 1; i++) {
         _sumAltitudes += _lastAltitudes[i];
-        _sumDiffAltitudes += (_lastAltitudes[i+1] - _lastAltitudes[i]).abs();
+        _sumDiffAltitudes += (_lastAltitudes[i + 1] - _lastAltitudes[i]).abs();
       }
-      _sumAltitudes += _lastAltitudes[_smoothingThreshold-1];
+      _sumAltitudes += _lastAltitudes[_smoothingThreshold - 1];
       _lastAltitudes.removeAt(0);
       if (_sumDiffAltitudes >= 1) {
         return;
@@ -134,7 +181,7 @@ class Location {
       _accuracyStreamController = StreamController.broadcast();
     }
 
-    return _accuracyStreamController.stream;
+    return _accuracyStreamController!.stream;
   }
 
   Stream<DistanceEvent> getTraveledDistanceStream() {
@@ -146,7 +193,7 @@ class Location {
       _traveledDistanceStreamController = StreamController.broadcast();
     }
 
-    return _traveledDistanceStreamController.stream;
+    return _traveledDistanceStreamController!.stream;
   }
 }
 
@@ -164,5 +211,6 @@ class DistanceEvent {
   final double relativeAltitudeGain;
   final double relativeAltitudeLoss;
 
-  DistanceEvent(this.traveledDistance, this.relativeAltitudeGain, this.relativeAltitudeLoss);
+  DistanceEvent(this.traveledDistance, this.relativeAltitudeGain,
+      this.relativeAltitudeLoss);
 }

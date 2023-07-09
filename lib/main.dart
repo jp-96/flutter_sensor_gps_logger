@@ -13,13 +13,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sensor GPS Logger',
-      theme: ThemeData(
-        primarySwatch: Colors.blue
-      ),
-      home: MyHomePage(),
-      debugShowCheckedModeBanner: false
-    );
+        title: 'Sensor GPS Logger',
+        theme: ThemeData(primarySwatch: Colors.blue),
+        home: MyHomePage(),
+        debugShowCheckedModeBanner: false);
   }
 }
 
@@ -29,12 +26,12 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  Icon buttonIcon;
-  String buttonText;
-  Color buttonColor;
+  Icon? buttonIcon;
+  String? buttonText;
+  Color? buttonColor;
 
-  bool isLocating;
-  bool isLogging;
+  bool? isLocating;
+  bool isLogging = false;
 
   double accuracy = 9999.0;
   double relativeAltitudeGain = 0.0;
@@ -49,13 +46,14 @@ class _MyHomePageState extends State<MyHomePage> {
   double y = 0.0;
   double z = 0.0;
 
-  int accuracyFilter;
-  int distanceFilter;
+  int accuracyFilter = 0;
+  int distanceFilter = 0;
 
-  StreamSubscription<PositionEvent> accuracyStreamSubscription;
-  StreamSubscription<DistanceEvent> traveledDistanceStreamSubscription;
-  StreamSubscription<MotionEvent> motionStreamSubscription;
-  StreamSubscription<int> stepCounterStreamSubscription;
+  StreamSubscription<PositionEvent>? accuracyStreamSubscription;
+  StreamSubscription<DistanceEvent>? traveledDistanceStreamSubscription;
+  StreamSubscription<MotionEvent>? motionStreamSubscription;
+  //StreamSubscription<int>? stepCounterStreamSubscription;
+  StreamSubscription<StepCount>? stepCounterStreamSubscription;
 
   toggleLogging() {
     setState(() {
@@ -70,28 +68,32 @@ class _MyHomePageState extends State<MyHomePage> {
         relativeAltitudeGain = 0.0;
         relativeAltitudeLoss = 0.0;
         stepCount = 0;
-        if (traveledDistanceStreamSubscription != null || accuracyStreamSubscription != null) {
+        if (traveledDistanceStreamSubscription != null ||
+            accuracyStreamSubscription != null) {
           Location().cancelPositionStream();
-          accuracyStreamSubscription.cancel();
+          accuracyStreamSubscription?.cancel();
           accuracyStreamSubscription = null;
-          traveledDistanceStreamSubscription.cancel();
+          traveledDistanceStreamSubscription?.cancel();
           traveledDistanceStreamSubscription = null;
-          stepCounterStreamSubscription.cancel();
+          stepCounterStreamSubscription?.cancel();
           stepCounterStreamSubscription = null;
-          motionStreamSubscription.pause();
+          motionStreamSubscription?.pause();
           askToSendLog();
         }
-      } else if (!isLocating) {
-        Location().setAccuracyFilter(accuracyFilter);
-        Location().setDistanceFilter(distanceFilter);
-        Logger().setAccuracyFilter(accuracyFilter);
-        Logger().setDistanceFilter(distanceFilter);
-        accuracyStreamSubscription = Location().getAccuracyStream().listen((PositionEvent positionEvent) {
+      } else if (!isLocating!) {
+        Location().setAccuracyFilter(accuracyFilter!);
+        Location().setDistanceFilter(distanceFilter!);
+        Logger().setAccuracyFilter(accuracyFilter!);
+        Logger().setDistanceFilter(distanceFilter!);
+        accuracyStreamSubscription = Location()
+            .getAccuracyStream()
+            .listen((PositionEvent positionEvent) {
           setState(() {
             this.accuracy = positionEvent.accuracy;
           });
           Logger().setAccuracy(positionEvent.accuracy);
-          Logger().setLatitudeLongitude(positionEvent.latitude, positionEvent.longitude);
+          Logger().setLatitudeLongitude(
+              positionEvent.latitude, positionEvent.longitude);
           Logger().setAltitude(positionEvent.altitude);
         });
         isLocating = true;
@@ -99,26 +101,30 @@ class _MyHomePageState extends State<MyHomePage> {
         buttonText = "Start Logging";
         buttonColor = Colors.green;
         isLogging = false;
-      } else if (!isLogging && isLocating) {
+      } else if (!isLogging && isLocating == true) {
         buttonIcon = Icon(Icons.stop);
         buttonText = "Stop Logging";
         buttonColor = Colors.red;
         isLogging = true;
         stepCountStartAndroid = 0;
         stepCountStartSetAndroid = false;
-        traveledDistanceStreamSubscription = Location().getTraveledDistanceStream().listen((DistanceEvent distanceEvent) {
+        traveledDistanceStreamSubscription = Location()
+            .getTraveledDistanceStream()
+            .listen((DistanceEvent distanceEvent) {
           this.traveledDistance = distanceEvent.traveledDistance;
           this.relativeAltitudeGain = distanceEvent.relativeAltitudeGain;
           this.relativeAltitudeLoss = distanceEvent.relativeAltitudeLoss;
           Logger().setTraveledDistance(traveledDistance);
-          Logger().setRelativeAltitudes(relativeAltitudeGain, relativeAltitudeLoss);
+          Logger()
+              .setRelativeAltitudes(relativeAltitudeGain, relativeAltitudeLoss);
         });
-        stepCounterStreamSubscription = Pedometer().stepCountStream.listen((int stepCount){
+        stepCounterStreamSubscription =
+            Pedometer.stepCountStream.listen((StepCount event) {
           if (!stepCountStartSetAndroid && Platform.isAndroid) {
-            stepCountStartAndroid = stepCount;
+            stepCountStartAndroid = event.steps;
             stepCountStartSetAndroid = true;
           }
-          this.stepCount = stepCount - stepCountStartAndroid;
+          this.stepCount = event.steps - stepCountStartAndroid;
           Logger().setStepCount(stepCount - stepCountStartAndroid);
         });
       }
@@ -126,94 +132,91 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   @override
-    void initState() {
-      super.initState();
+  void initState() {
+    super.initState();
 
-      toggleLogging();
+    toggleLogging();
 
-      motionStreamSubscription = Motion().getMotionStream().listen((MotionEvent motionEvent) {
-        setState(() {
-          this.x = motionEvent.x;
-          this.y = motionEvent.y;
-          this.z = motionEvent.z;
-        });
-        Logger().setMotionData(x, y, z);
-        if (isLogging) {
-          Logger().addEntry();
-        }
+    motionStreamSubscription =
+        Motion().getMotionStream().listen((MotionEvent motionEvent) {
+      setState(() {
+        this.x = motionEvent.x;
+        this.y = motionEvent.y;
+        this.z = motionEvent.z;
       });
-    }
+      Logger().setMotionData(x, y, z);
+      if (isLogging) {
+        Logger().addEntry();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Location and Motion Logger"),
-      ),
-      body: ListView(
-        children: <Widget>[
-          Card(
-            margin: EdgeInsets.only(top: 10.0, left: 10.0, right: 10.0),
-            child: Container(
-              margin: EdgeInsets.all(15.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: <Widget>[
-                  Text("Location Sensor", style: TextStyle(fontSize: 18)),
-                  Text("(GPS)", style: TextStyle(fontSize: 12)),
-                  Divider(height: 20.0),
-                  Stepper(10, "Accuracy filter", accuracyFilterCallback),
-                  Stepper(5, "Distance filter", distanceFilterCallback),
-                  Divider(height: 20.0),
-                  Text("Accuracy: ${accuracy.toStringAsFixed(2)} m"),
-                  Text("Traveled Distance: ${traveledDistance.toStringAsFixed(1)} m"),
-                  Text("Rel. Altitude Gain: ${relativeAltitudeGain.toStringAsFixed(1)} m"),
-                  Text("Rel. Altitude Loss: ${relativeAltitudeLoss.toStringAsFixed(1)} m")
-                ],
-              )
-            )
-          ),
-          Card(
-            margin: EdgeInsets.only(top: 10.0, left: 10.0, right: 10.0),
-            child: Container(
-              margin: EdgeInsets.all(15.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: <Widget>[
-                  Text("Motion Sensor", style: TextStyle(fontSize: 18)),
-                  Text("(Accelerometer)", style: TextStyle(fontSize: 12)),
-                  Divider(height: 20.0),
-                  Text("X: ${x.toStringAsFixed(4)}"),
-                  Text("Y: ${y.toStringAsFixed(4)}"),
-                  Text("Z: ${z.toStringAsFixed(4)}")
-                ],
-              )
-            )
-          ),
-          Card(
-            margin: EdgeInsets.only(top: 10.0, left: 10.0, right: 10.0),
-            child: Container(
-              margin: EdgeInsets.all(15.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: <Widget>[
-                  Text("Step Count", style: TextStyle(fontSize: 18)),
-                  Text("(Native via API)", style: TextStyle(fontSize: 12)),
-                  Divider(height: 20.0),
-                  Text("Steps: $stepCount"),
-                ],
-              )
-            )
-          )
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: toggleLogging,
-        icon: buttonIcon,
-        label: Text(buttonText),
-        backgroundColor: buttonColor
-      )
-    );
+        appBar: AppBar(
+          title: Text("Location and Motion Logger"),
+        ),
+        body: ListView(
+          children: <Widget>[
+            Card(
+                margin: EdgeInsets.only(top: 10.0, left: 10.0, right: 10.0),
+                child: Container(
+                    margin: EdgeInsets.all(15.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: <Widget>[
+                        Text("Location Sensor", style: TextStyle(fontSize: 18)),
+                        Text("(GPS)", style: TextStyle(fontSize: 12)),
+                        Divider(height: 20.0),
+                        Stepper(10, "Accuracy filter", accuracyFilterCallback),
+                        Stepper(5, "Distance filter", distanceFilterCallback),
+                        Divider(height: 20.0),
+                        Text("Accuracy: ${accuracy.toStringAsFixed(2)} m"),
+                        Text(
+                            "Traveled Distance: ${traveledDistance.toStringAsFixed(1)} m"),
+                        Text(
+                            "Rel. Altitude Gain: ${relativeAltitudeGain.toStringAsFixed(1)} m"),
+                        Text(
+                            "Rel. Altitude Loss: ${relativeAltitudeLoss.toStringAsFixed(1)} m")
+                      ],
+                    ))),
+            Card(
+                margin: EdgeInsets.only(top: 10.0, left: 10.0, right: 10.0),
+                child: Container(
+                    margin: EdgeInsets.all(15.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: <Widget>[
+                        Text("Motion Sensor", style: TextStyle(fontSize: 18)),
+                        Text("(Accelerometer)", style: TextStyle(fontSize: 12)),
+                        Divider(height: 20.0),
+                        Text("X: ${x.toStringAsFixed(4)}"),
+                        Text("Y: ${y.toStringAsFixed(4)}"),
+                        Text("Z: ${z.toStringAsFixed(4)}")
+                      ],
+                    ))),
+            Card(
+                margin: EdgeInsets.only(top: 10.0, left: 10.0, right: 10.0),
+                child: Container(
+                    margin: EdgeInsets.all(15.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: <Widget>[
+                        Text("Step Count", style: TextStyle(fontSize: 18)),
+                        Text("(Native via API)",
+                            style: TextStyle(fontSize: 12)),
+                        Divider(height: 20.0),
+                        Text("Steps: $stepCount"),
+                      ],
+                    )))
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+            onPressed: toggleLogging,
+            icon: buttonIcon,
+            label: Text(buttonText!),
+            backgroundColor: buttonColor));
   }
 
   void askToSendLog() {
@@ -225,21 +228,20 @@ class _MyHomePageState extends State<MyHomePage> {
         return AlertDialog(
           title: new Text("Send log?"),
           content: new TextField(
-            decoration: new InputDecoration(hintText: "Notes (optional)"),
-            onChanged: (String input) {
-              notes = input;
-            }
-          ),
+              decoration: new InputDecoration(hintText: "Notes (optional)"),
+              onChanged: (String input) {
+                notes = input;
+              }),
           actions: <Widget>[
-            new FlatButton(
+            new TextButton(
               child: new Text("Cancel"),
               onPressed: () {
                 Logger().clearEntries();
-                motionStreamSubscription.resume();
+                motionStreamSubscription!.resume();
                 Navigator.of(context).pop();
               },
             ),
-            new FlatButton(
+            new TextButton(
               child: new Text("Send"),
               onPressed: () {
                 asynchronouslySendLog(notes);
@@ -252,28 +254,26 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  asynchronouslySendLog (String notes) async {
+  asynchronouslySendLog(String notes) async {
     bool result = await Logger().shareLog(notes);
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: new Text(result?"Success":"Error"),
-          actions: <Widget>[
-            new FlatButton(
-              child: new Text("Okay"),
-              onPressed: () {
-                Navigator.of(context).pop();
-                if (!result) {
-                  askToSendLog();
-                } else {
-                  motionStreamSubscription.resume();
-                }
-              }
-            )
-          ]
-        );
+            title: new Text(result ? "Success" : "Error"),
+            actions: <Widget>[
+              new TextButton(
+                  child: new Text("Okay"),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    if (!result) {
+                      askToSendLog();
+                    } else {
+                      motionStreamSubscription!.resume();
+                    }
+                  })
+            ]);
       },
     );
   }
@@ -287,29 +287,29 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   @override
-    void dispose() {
-      if (accuracyStreamSubscription != null) {
-        accuracyStreamSubscription.cancel();
-        accuracyStreamSubscription = null;
-      }
-
-      if (traveledDistanceStreamSubscription != null) {
-        traveledDistanceStreamSubscription.cancel();
-        traveledDistanceStreamSubscription = null;
-      }
-
-      if (motionStreamSubscription != null) {
-        motionStreamSubscription.cancel();
-        motionStreamSubscription = null;
-      }
-
-      if (stepCounterStreamSubscription != null) {
-        stepCounterStreamSubscription.cancel();
-        stepCounterStreamSubscription = null;
-      }
-
-      super.dispose();
+  void dispose() {
+    if (accuracyStreamSubscription != null) {
+      accuracyStreamSubscription!.cancel();
+      accuracyStreamSubscription = null;
     }
+
+    if (traveledDistanceStreamSubscription != null) {
+      traveledDistanceStreamSubscription!.cancel();
+      traveledDistanceStreamSubscription = null;
+    }
+
+    if (motionStreamSubscription != null) {
+      motionStreamSubscription!.cancel();
+      motionStreamSubscription = null;
+    }
+
+    if (stepCounterStreamSubscription != null) {
+      stepCounterStreamSubscription!.cancel();
+      stepCounterStreamSubscription = null;
+    }
+
+    super.dispose();
+  }
 }
 
 class Stepper extends StatefulWidget {
@@ -346,21 +346,19 @@ class _StepperState extends State<Stepper> {
         ButtonTheme(
           minWidth: 28.0,
           height: 26.0,
-          child: FlatButton(
+          child: TextButton(
             onPressed: _decrement,
             child: Text("-", style: TextStyle(color: Colors.blue)),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap
-          )
+          ),
         ),
         Text("$_counter m"),
         ButtonTheme(
           minWidth: 28.0,
           height: 26.0,
-          child: FlatButton(
+          child: TextButton(
             onPressed: _increment,
             child: Text("+", style: TextStyle(color: Colors.blue)),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap
-          )
+          ),
         )
       ],
     );
